@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e7ebef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c1520" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Clock-Out">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23ffab1f'/%3E%3Cpath d='M32 15v17l11 7' stroke='%230c1520' stroke-width='6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body>
+<title>Clock-Out Countdown</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow+Semi+Condensed:wght@500;600&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-column time sheet. Header, two stacked clock panels, a two-week time card. */
+:root {
+  --bg: #e7ebef;
+  --panel: #f7f9fa;
+  --ink: #132130;
+  --muted: #586776;
+  --line: #c8d1da;
+  --accent: #e07c0c;
+  --accent-ink: #a35500;
+  --accent-soft: rgba(224, 124, 12, .2);
+  --digits: #132130;
+  --glow: transparent;
+  --live: #1b8a4c;
+
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Barlow", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-label: "Barlow Semi Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1520; --panel: #13202e; --ink: #edf0ee; --muted: #8b9aaa; --line: #22354a;
+    --accent: #ffab1f; --accent-ink: #ffbe4f; --accent-soft: rgba(255, 171, 31, .17);
+    --digits: #ffb33d; --glow: rgba(255, 170, 40, .3); --live: #52d98d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1520; --panel: #13202e; --ink: #edf0ee; --muted: #8b9aaa; --line: #22354a;
+  --accent: #ffab1f; --accent-ink: #ffbe4f; --accent-soft: rgba(255, 171, 31, .17);
+  --digits: #ffb33d; --glow: rgba(255, 170, 40, .3); --live: #52d98d;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sheet {
+  max-width: 780px;
+  margin: 0 auto;
+  padding-block: clamp(20px, 5vw, 56px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: clamp(12px, 2.4vw, 20px);
+}
+
+.head { display: grid; gap: 6px; padding-bottom: 4px; }
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-label); font-weight: 600; font-size: 13px;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+}
+h1 {
+  margin: 0;
+  font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(32px, 7vw, 58px); line-height: .95;
+  text-transform: uppercase; letter-spacing: .005em; text-wrap: balance;
+}
+h1 .hl { color: var(--accent-ink); }
+
+.panel {
+  min-width: 0;
+  display: grid;
+  gap: clamp(10px, 2vw, 16px);
+  padding: clamp(16px, 3.6vw, 28px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.panel-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+h2 {
+  margin: 0;
+  font-family: var(--font-label); font-weight: 600; font-size: 15px;
+  letter-spacing: .14em; text-transform: uppercase;
+}
+
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 11px 4px 9px;
+  border: 1px solid var(--line); border-radius: 999px;
+  font-family: var(--font-label); font-weight: 600; font-size: 13px;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.chip.live { color: var(--live); border-color: currentColor; }
+.chip.live .dot { animation: pulse 1.6s ease-in-out infinite; }
+.chip.wait { color: var(--accent-ink); border-color: currentColor; }
+@keyframes pulse { 50% { opacity: .25; } }
+
+.clock-box { container-type: inline-size; }
+.clock {
+  display: flex; align-items: flex-start;
+  font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(40px, 13vw, 150px);
+  font-size: clamp(40px, 21cqi, 150px);
+  line-height: .9;
+  color: var(--digits);
+  text-shadow: 0 0 .28em var(--glow);
+  transition: opacity .4s;
+}
+.grp { display: flex; flex-direction: column; align-items: center; }
+.num { display: flex; }
+.d { width: .5em; text-align: center; }
+.colon { width: .28em; text-align: center; transform: translateY(-.04em); }
+.lab {
+  margin-top: 8px;
+  font-family: var(--font-label); font-weight: 600; font-size: 12px; line-height: 1;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+  text-shadow: none;
+}
+.panel.paused .clock { opacity: .5; }
+.sub { margin: 0; color: var(--muted); font-size: 15px; }
+.sub b { color: var(--ink); font-weight: 600; }
+
+.count { font-family: var(--font-label); font-weight: 600; font-size: 14px; letter-spacing: .04em; color: var(--accent-ink); }
+.weeks { display: grid; gap: 14px; }
+.week { display: grid; gap: 6px; }
+.week-label {
+  font-family: var(--font-label); font-weight: 500; font-size: 12px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+.days { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.day {
+  position: relative; overflow: hidden;
+  display: grid; justify-items: center; gap: 1px;
+  padding: 8px 4px 7px;
+  background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px;
+}
+.day::before {
+  content: ""; position: absolute; inset: auto 0 0;
+  height: calc(var(--f, 0) * 100%);
+  background: var(--accent-soft);
+}
+.day > * { position: relative; }
+.dname {
+  font-family: var(--font-label); font-weight: 600; font-size: 11px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+}
+.dnum { font-family: var(--font-display); font-weight: 700; font-size: clamp(24px, 5.5vw, 34px); line-height: 1; }
+.dstat { font-family: var(--font-label); font-weight: 500; font-size: 12px; line-height: 1.2; text-align: center; color: var(--muted); }
+.day.done .dnum { color: var(--muted); }
+.day.today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.day.today .dstat { color: var(--ink); font-weight: 600; }
+.day.last .dstat { color: var(--accent-ink); font-weight: 600; }
+
+.foot { margin: 4px 0 0; max-width: 60ch; font-size: 13px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .chip.live .dot { animation: none; }
+  .clock { transition: none; }
+}
+</style>
+
+<main class="sheet">
+  <header class="head">
+    <p class="eyebrow">Gordon Food Service · Final two weeks</p>
+    <h1 id="headline">Clocking out <span class="hl">Friday, Oct 30</span> at 5:00 PM</h1>
+  </header>
+
+  <section class="panel" id="panel-total" aria-labelledby="h-total">
+    <div class="panel-top">
+      <h2 id="h-total">Total time left</h2>
+      <span class="chip" id="chip-total"><span class="dot"></span><span class="chip-text">Running</span></span>
+    </div>
+    <div class="clock-box"><div class="clock" id="clock-total" role="timer"></div></div>
+    <p class="sub" id="sub-total">&nbsp;</p>
+  </section>
+
+  <section class="panel" id="panel-work" aria-labelledby="h-work">
+    <div class="panel-top">
+      <h2 id="h-work">Working hours left</h2>
+      <span class="chip" id="chip-work"><span class="dot"></span><span class="chip-text">On the clock</span></span>
+    </div>
+    <div class="clock-box"><div class="clock" id="clock-work" role="timer"></div></div>
+    <p class="sub" id="sub-work">&nbsp;</p>
+  </section>
+
+  <section class="panel" aria-labelledby="h-card">
+    <div class="panel-top">
+      <h2 id="h-card">Time card</h2>
+      <span class="count" id="shifts-left"></span>
+    </div>
+    <div class="weeks" id="weeks"></div>
+  </section>
+
+  <p class="foot">Uses this device's clock and time zone. Working hours count Monday to Friday, 8:00 AM to 5:00 PM.</p>
+</main>
+
+<script>
+(() => {
+  // Last day: Friday, October 30, 2026 at 5:00 PM, in this device's local time.
+  const END = new Date(2026, 9, 30, 17, 0, 0).getTime();
+  const SHIFT_START = 8, SHIFT_END = 17; // 8:00 AM to 5:00 PM, Monday to Friday
+  const DAY_MS = 864e5, HOUR_MS = 36e5;
+
+  // --- calc ---
+  const at = (date, hour) => { const t = new Date(date); t.setHours(hour, 0, 0, 0); return t.getTime(); };
+  const isWorkday = date => { const d = new Date(date).getDay(); return d >= 1 && d <= 5; };
+
+  // Milliseconds of weekday 8-to-5 time between now and END.
+  function workLeft(now) {
+    let ms = 0;
+    for (const day = new Date(now); at(day, 0) <= END; day.setDate(day.getDate() + 1)) {
+      if (!isWorkday(day)) continue;
+      const from = Math.max(at(day, SHIFT_START), now);
+      const to = Math.min(at(day, SHIFT_END), END);
+      if (to > from) ms += to - from;
+    }
+    return ms;
+  }
+
+  // Start of the next shift after now, or null if none remain.
+  function nextShiftStart(now) {
+    for (const day = new Date(now); at(day, 0) <= END; day.setDate(day.getDate() + 1)) {
+      if (isWorkday(day) && at(day, SHIFT_START) > now) return at(day, SHIFT_START);
+    }
+    return null;
+  }
+
+  const onTheClock = now => now < END && isWorkday(now) && now >= at(now, SHIFT_START) && now < at(now, SHIFT_END);
+  // --- /calc ---
+
+  const pad = n => String(n).padStart(2, "0");
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const $ = id => document.getElementById(id);
+
+  function buildClock(root) {
+    const group = label => {
+      const g = el("div", "grp"), num = el("div", "num");
+      g.append(num, el("div", "lab", label));
+      root.append(g);
+      return num;
+    };
+    const colon = () => { const c = el("span", "colon", ":"); c.setAttribute("aria-hidden", "true"); root.append(c); };
+    const h = group("Hours"); colon();
+    const m = group("Minutes"); colon();
+    const s = group("Seconds");
+    return { root, h, m, s };
+  }
+
+  function setNum(box, str) {
+    if (box.childElementCount !== str.length) {
+      box.replaceChildren(...[...str].map(() => el("span", "d")));
+    }
+    [...str].forEach((ch, i) => {
+      const d = box.children[i];
+      if (d.textContent !== ch) d.textContent = ch;
+    });
+  }
+
+  function setClock(clock, ms) {
+    const t = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
+    setNum(clock.h, pad(h));
+    setNum(clock.m, pad(m));
+    setNum(clock.s, pad(s));
+    clock.root.setAttribute("aria-label", `${h} hours, ${m} minutes, ${s} seconds`);
+  }
+
+  function setChip(chip, state, text) {
+    chip.classList.toggle("live", state === "live");
+    chip.classList.toggle("wait", state === "wait");
+    const t = chip.querySelector(".chip-text");
+    if (t.textContent !== text) t.textContent = text;
+  }
+
+  function whenLabel(now, t) {
+    if (sameDay(now, t)) return "today";
+    if (sameDay(now + DAY_MS, t)) return "tomorrow";
+    return new Date(t).toLocaleDateString("en-US", { weekday: "long" });
+  }
+
+  const totalClock = buildClock($("clock-total"));
+  const workClock = buildClock($("clock-work"));
+
+  // Time card: the last ten workdays, Mon Oct 19 to Fri Oct 30.
+  const cells = [];
+  [[19, 20, 21, 22, 23], [26, 27, 28, 29, 30]].forEach(week => {
+    const wrap = el("div", "week");
+    wrap.append(el("div", "week-label", `Week of Oct ${week[0]}`));
+    const row = el("div", "days");
+    week.forEach(d => {
+      const date = new Date(2026, 9, d);
+      const cell = el("div", "day");
+      const stat = el("span", "dstat", "9h");
+      cell.append(
+        el("span", "dname", date.toLocaleDateString("en-US", { weekday: "short" })),
+        el("span", "dnum", String(d)),
+        stat
+      );
+      row.append(cell);
+      cells.push({ date, cell, stat });
+    });
+    wrap.append(row);
+    $("weeks").append(wrap);
+  });
+
+  function render() {
+    const now = Date.now();
+    const total = Math.max(0, END - now);
+    const work = workLeft(now);
+    const done = total <= 0;
+    const working = onTheClock(now);
+
+    setClock(totalClock, total);
+    setClock(workClock, work);
+
+    // Total panel
+    setChip($("chip-total"), done ? "" : "live", done ? "Done" : "Running");
+    const days = Math.floor(total / DAY_MS), hrs = Math.floor(total % DAY_MS / HOUR_MS);
+    $("sub-total").innerHTML = done
+      ? "That's the whole thing."
+      : days > 0
+        ? `<b>${plural(days, "day")}, ${plural(hrs, "hour")}</b> on the calendar`
+        : `<b>Under a day</b> on the calendar`;
+
+    // Working-hours panel
+    $("panel-work").classList.toggle("paused", !done && !working);
+    if (done) {
+      setChip($("chip-work"), "", "Clocked out");
+    } else if (working) {
+      setChip($("chip-work"), "live", "On the clock");
+    } else {
+      const next = nextShiftStart(now);
+      setChip($("chip-work"), "wait", next ? `Paused until ${whenLabel(now, next)} 8 AM` : "Paused");
+    }
+    $("sub-work").innerHTML = done
+      ? "No more shifts."
+      : `About <b>${(work / (9 * HOUR_MS)).toFixed(1)} workdays</b> at 9 hours each`;
+
+    // Time card
+    let shiftsLeft = 0;
+    cells.forEach(({ date, cell, stat }, i) => {
+      const s = at(date, SHIFT_START), e = at(date, SHIFT_END);
+      const f = Math.min(1, Math.max(0, (now - s) / (e - s)));
+      const isLast = i === cells.length - 1;
+      const isToday = sameDay(date, now) && now < e;
+      if (now < e) shiftsLeft++;
+      cell.style.setProperty("--f", f.toFixed(4));
+      cell.classList.toggle("done", now >= e);
+      cell.classList.toggle("today", isToday);
+      cell.classList.toggle("last", isLast && now < e);
+      let txt;
+      if (now >= e) txt = "Done";
+      else if (isToday) {
+        const left = e - Math.max(now, s);
+        txt = `${Math.floor(left / HOUR_MS)}h ${Math.floor(left % HOUR_MS / 6e4)}m`;
+      } else txt = isLast ? "Last day" : "9h";
+      if (stat.textContent !== txt) stat.textContent = txt;
+    });
+    $("shifts-left").textContent = shiftsLeft ? `${plural(shiftsLeft, "shift")} left` : "All shifts done";
+
+    if (done) $("headline").textContent = "Clocked out for good. Congratulations.";
+  }
+
+  function tick() {
+    render();
+    setTimeout(tick, 1000 - (Date.now() % 1000) + 10);
+  }
+  tick();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+})();
+</script>
+</body>
+</html>
